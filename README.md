@@ -51,3 +51,5 @@ The preferred method for running this project is on a local server. This is **re
 * **JavaScript (ES6+)**
 * [**Konva.js**](https://konvajs.org/): A 2D HTML5 canvas library for high-performance drawing and interactivity.
 * [**Font Awesome**](https://fontawesome.com/): Used for the icons in the toolbar.
+
+![Screenshot](screenshots/screenshot.jpg "Screenshot of Application")
