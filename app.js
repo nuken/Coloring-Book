@@ -11,6 +11,7 @@ let isPaint = false;
 let lastLine;
 let currentImageNode = null;
 let fillHistory = [];
+let historyStack = []; // --- START: NEW --- Unified history for undo
 
 const container = document.querySelector('.canvas-container');
 const stage = new Konva.Stage({
@@ -76,27 +77,37 @@ brushSizeSlider.addEventListener('input', (e) => {
     currentBrushSize = e.target.value;
 });
 
+// --- START: MODIFIED --- Updated Undo Button Logic
 undoBtn.addEventListener('click', () => {
-    const shapes = drawingLayer.getChildren();
-    if (shapes.length > 0) {
-        shapes[shapes.length - 1].destroy();
+    if (historyStack.length === 0) return;
+
+    const lastAction = historyStack.pop();
+
+    if (lastAction.type === 'brush') {
+        // If it was a brush stroke, destroy the Konva.Line node
+        lastAction.node.destroy();
         drawingLayer.batchDraw();
+    } else if (lastAction.type === 'fill') {
+        // If it was a fill, we must restore the canvas pixel data
+
+        // Also remove this fill from the resize history
+        fillHistory.pop();
+
+        // Restore the saved canvas state
+        const sourceCanvas = currentImageNode.image();
+        sourceCanvas.getContext('2d').putImageData(lastAction.imageData, 0, 0);
+        backgroundLayer.batchDraw();
     }
 });
+// --- END: MODIFIED ---
 
-// --- START: MODIFIED CODE (Fix 1) ---
-// Updated clear button logic to reload the image
 clearBtn.addEventListener('click', () => {
-    // Find the currently active thumbnail to reload the correct image
     const activeThumb = document.querySelector('.thumbnail.active');
     if (activeThumb) {
-        // Extract the file name from the image source URL
         const fileName = activeThumb.src.split('/').pop();
-        // Reloading the image properly clears all drawings and fill data
         loadImageByName(fileName);
     }
 });
-// --- END: MODIFIED CODE (Fix 1) ---
 
 saveBtn.addEventListener('click', () => {
     const dataURL = stage.toDataURL({
@@ -138,30 +149,25 @@ function colorsMatch(data, index, color, tolerance = 20) {
 
 // --- FLOOD FILL LOGIC ---
 function floodFill(startX, startY, fillColorRgb) {
-    // --- START: MODIFIED CODE ---
-    // Get context from the Konva.Image's source canvas, not the layer's canvas
     if (!currentImageNode) return;
     const context = currentImageNode.image().getContext('2d');
     const { width, height } = context.canvas;
     const imageData = context.getImageData(0, 0, width, height);
-    // --- END: MODIFIED CODE ---
-    const { data } = imageData; // This line was also modified slightly
+    const { data } = imageData;
 
     const startIndex = (startY * width + startX) * 4;
     const startColor = [data[startIndex], data[startIndex + 1], data[startIndex + 2]];
 
-    // Don't fill black lines
     if (startColor[0] < 30 && startColor[1] < 30 && startColor[2] < 30) {
         return;
     }
-    // Don't fill if already the same color
     if (colorsMatch(data, startIndex, fillColorRgb, 10)) {
         return;
     }
 
     const isBoundary = (index) => !colorsMatch(data, index, startColor, 35);
     const stack = [[startX, startY]];
-    const fillColor = [...fillColorRgb, 255]; // Add alpha channel
+    const fillColor = [...fillColorRgb, 255];
 
     while (stack.length > 0) {
         const [x, y] = stack.pop();
@@ -169,24 +175,20 @@ function floodFill(startX, startY, fillColorRgb) {
 
         const currentIndex = (y * width + x) * 4;
 
-        // Check if already filled
         if (data[currentIndex] === fillColor[0] &&
             data[currentIndex + 1] === fillColor[1] &&
             data[currentIndex + 2] === fillColor[2]) {
             continue;
         }
-        // Check if it's a boundary
         if (isBoundary(currentIndex)) {
             continue;
         }
 
-        // Fill the pixel
         data[currentIndex] = fillColor[0];
         data[currentIndex + 1] = fillColor[1];
         data[currentIndex + 2] = fillColor[2];
         data[currentIndex + 3] = fillColor[3];
 
-        // Add neighbors to stack
         stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
     }
     context.putImageData(imageData, 0, 0);
@@ -218,32 +220,24 @@ function loadImageByName(fileName) {
     drawingLayer.destroyChildren();
     backgroundLayer.destroyChildren();
     fillHistory = [];
+    historyStack = []; // --- START: NEW --- Clear history on new image
     const imageUrl = `images/${fileName}`;
     Konva.Image.fromURL(imageUrl, (imageNode) => {
-        // --- START: MODIFIED CODE ---
-        // Create an off-screen canvas and use it as the image source
-        // This allows us to modify its pixels for flood fill
         const img = imageNode.image();
         const offscreenCanvas = document.createElement('canvas');
-        // Use the original image dimensions for the source canvas
         offscreenCanvas.width = img.naturalWidth || img.width;
         offscreenCanvas.height = img.naturalHeight || img.height;
         offscreenCanvas.getContext('2d').drawImage(img, 0, 0);
 
-        // Set the Konva.Image to use our new canvas as its source
         imageNode.image(offscreenCanvas);
         currentImageNode = imageNode;
-        // --- END: MODIFIED CODE ---
 
         const dimensions = fitImageToContainer(imageNode.image());
         imageNode.setAttrs({ ...dimensions, name: 'coloringImage' });
 
-        // --- START: Brush Clipping Fix ---
-        // Add a clipping function to the drawing layer to keep brush in bounds
         drawingLayer.clipFunc(function (ctx) {
             ctx.rect(dimensions.x, dimensions.y, dimensions.width, dimensions.height);
         });
-        // --- END: Brush Clipping Fix ---
 
         backgroundLayer.add(imageNode);
         backgroundLayer.batchDraw();
@@ -258,20 +252,22 @@ stage.on('click tap', (e) => {
         const relativeY = (pos.y - currentImageNode.y()) / currentImageNode.height();
 
         if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
+            // --- START: NEW --- Save canvas state before filling
+            const sourceCanvas = currentImageNode.image();
+            const beforeImageData = sourceCanvas.getContext('2d').getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+            historyStack.push({ type: 'fill', imageData: beforeImageData });
+            // --- END: NEW ---
+
             const fillColor = hexToRgb(currentColor);
             fillHistory.push({ relativeX, relativeY, color: fillColor });
 
-            // --- START: MODIFIED CODE ---
-            // Calculate x/y relative to the source canvas, not the stage
-            const sourceCanvas = currentImageNode.image();
-            const x = Math.floor(relativeX * sourceCanvas.width);
-            const y = Math.floor(relativeY * sourceCanvas.height);
+            const sourceCanvasForFill = currentImageNode.image();
+            const x = Math.floor(relativeX * sourceCanvasForFill.width);
+            const y = Math.floor(relativeY * sourceCanvasForFill.height);
 
             floodFill(x, y, fillColor);
 
-            // Redraw the layer to show the change from the modified source
             backgroundLayer.batchDraw();
-            // --- END: MODIFIED CODE ---
         }
     }
 });
@@ -290,7 +286,13 @@ stage.on('mousedown touchstart', (e) => {
     drawingLayer.add(lastLine);
 });
 
-stage.on('mouseup touchend', () => { isPaint = false; });
+// --- START: MODIFIED --- Add brush stroke to history on mouseup
+stage.on('mouseup touchend', () => {
+    if (!isPaint) return;
+    isPaint = false;
+    historyStack.push({ type: 'brush', node: lastLine });
+});
+// --- END: MODIFIED ---
 
 stage.on('mousemove touchmove', (e) => {
     if (!isPaint || currentTool !== 'brush') return;
@@ -312,26 +314,20 @@ const handleResize = debounce(() => {
         height: currentImageNode.height()
     };
 
-    // --- Get padding for accurate stage sizing ---
     const style = window.getComputedStyle(container);
     const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
 
     stage.width(container.clientWidth - paddingX);
     stage.height(container.clientHeight - paddingY);
-    // --- End padding logic ---
 
     const newDimensions = fitImageToContainer(currentImageNode.image());
     currentImageNode.setAttrs(newDimensions);
 
-    // --- START: Brush Clipping Fix ---
-    // Update the clipping area on resize
     drawingLayer.clipFunc(function (ctx) {
         ctx.rect(newDimensions.x, newDimensions.y, newDimensions.width, newDimensions.height);
     });
-    // --- END: Brush Clipping Fix ---
 
-    // Reposition brush strokes
     drawingLayer.getChildren().forEach(shape => {
         if (shape instanceof Konva.Line) {
             const oldPoints = shape.points();
@@ -350,25 +346,19 @@ const handleResize = debounce(() => {
 
     stage.batchDraw();
 
-    // Re-apply fills after resize
     requestAnimationFrame(() => {
-        // --- START: MODIFIED CODE ---
-        // Get the source canvas once
         if (!currentImageNode) return;
         const sourceCanvas = currentImageNode.image();
 
         fillHistory.forEach(fill => {
-            // Calculate target x/y relative to the source canvas
             const targetX = Math.floor(fill.relativeX * sourceCanvas.width);
             const targetY = Math.floor(fill.relativeY * sourceCanvas.height);
             floodFill(targetX, targetY, fill.color);
         });
 
-        // After all fills are re-applied, redraw the background layer
         if (fillHistory.length > 0) {
             backgroundLayer.batchDraw();
         }
-        // --- END: MODIFIED CODE ---
     });
 
 }, 250);
@@ -377,5 +367,3 @@ window.addEventListener('resize', handleResize);
 
 // --- INITIAL LOAD ---
 loadImageByName(imageFiles[0]);
-
-
