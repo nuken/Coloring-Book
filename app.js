@@ -209,6 +209,9 @@ function loadImageByName(fileName) {
         currentImageNode = imageNode;
         const dimensions = fitImageToContainer(imageNode.image());
         imageNode.setAttrs({ ...dimensions, name: 'coloringImage' });
+        drawingLayer.clipFunc(function (ctx) {
+            ctx.rect(dimensions.x, dimensions.y, dimensions.width, dimensions.height);
+        });
         backgroundLayer.add(imageNode);
         backgroundLayer.batchDraw();
     });
@@ -283,6 +286,10 @@ const handleResize = debounce(() => {
 
     const newDimensions = fitImageToContainer(currentImageNode.image());
     currentImageNode.setAttrs(newDimensions);
+
+    drawingLayer.clipFunc(function (ctx) {
+        ctx.rect(newDimensions.x, newDimensions.y, newDimensions.width, newDimensions.height);
+    });
 
     // Reposition brush strokes
     drawingLayer.getChildren().forEach(shape => {
