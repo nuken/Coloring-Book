@@ -13,8 +13,8 @@ body, html {
 }
 
 .app-container {
-    display: grid; /* <-- Add this */
-    grid-template-columns: 120px 1fr; /* <-- Add this */
+    display: grid;
+    grid-template-columns: 120px 1fr;
     width: 100%;
     height: 100%;
 }
@@ -28,7 +28,7 @@ body, html {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 25px; /* Increased gap */
+    gap: 25px;
     overflow-y: auto;
 }
 
@@ -37,7 +37,7 @@ body, html {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    width: 100%; /* Ensure groups take full width */
+    width: 100%;
 }
 
 .tool-label {
@@ -51,9 +51,9 @@ body, html {
     border: 2px solid transparent;
     background: #eee;
     border-radius: 10px;
-    width: 50px; /* Adjusted size */
-    height: 50px; /* Adjusted size */
-    font-size: 24px; /* Adjusted size */
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
     color: #333;
     cursor: pointer;
     transition: all 0.2s;
@@ -61,11 +61,10 @@ body, html {
     justify-content: center;
     align-items: center;
 }
-/* Group tool buttons horizontally */
+
 .tool-group .tool-btn {
     display: inline-flex;
 }
-
 
 .tool-btn.active {
     border-color: #007bff;
@@ -79,8 +78,8 @@ body, html {
 }
 
 .color-box {
-    width: 35px; /* Adjusted size */
-    height: 35px; /* Adjusted size */
+    width: 35px;
+    height: 35px;
     border-radius: 50%;
     cursor: pointer;
     border: 2px solid #fff;
@@ -94,21 +93,22 @@ body, html {
 }
 
 .canvas-container {
-    /* flex-grow: 1;  <-- Delete this line */
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: flex-start;
     padding: 20px;
     background-color: #e9e9e9;
-    overflow: hidden;
+    overflow: auto;
     position: relative;
-    min-width: 0; /* <-- Add this line */
+    min-width: 0;
+    max-width: 100%;
+    max-height: 100%;
 }
 
 .konvajs-content {
     box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    max-width: 100%;
 }
-
 
 /* --- START: NEW STYLES --- */
 .image-selector {
@@ -135,10 +135,11 @@ body, html {
     border-color: #007bff;
     transform: scale(1.1);
 }
+
 /* --- END: NEW STYLES --- */
+
 /* --- START: DESKTOP STYLES --- */
 @media (min-width: 1024px) {
-    /* Add this rule to update the grid for wide screens */
     .app-container {
         grid-template-columns: 180px 1fr;
     }
@@ -152,6 +153,31 @@ body, html {
     }
 }
 /* --- END: DESKTOP STYLES --- */
-.konvajs-content {
-    max-width: 100%;
+
+/* --- TABLET PORTRAIT FIXES --- */
+@media (max-width: 768px) and (orientation: portrait) {
+    .app-container {
+        grid-template-columns: 100px 1fr;
+    }
+    
+    .toolbar {
+        width: 100px;
+        padding: 10px;
+        gap: 15px;
+    }
+    
+    .tool-btn, .util-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+    
+    .color-box, .thumbnail {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .canvas-container {
+        padding: 10px;
+    }
 }

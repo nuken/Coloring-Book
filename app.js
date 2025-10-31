@@ -11,19 +11,18 @@ let isPaint = false;
 let lastLine;
 let currentImageNode = null;
 let fillHistory = [];
-let historyStack = []; // --- START: NEW --- Unified history for undo
+let historyStack = [];
 
 const container = document.querySelector('.canvas-container');
 const stage = new Konva.Stage({
     container: 'container',
-    width: container.offsetWidth,
-    height: container.offsetHeight,
+    width: container.clientWidth,
+    height: container.clientHeight,
 });
 
 const backgroundLayer = new Konva.Layer();
 const drawingLayer = new Konva.Layer();
 stage.add(backgroundLayer, drawingLayer);
-
 
 // --- UI ELEMENTS & EVENT LISTENERS ---
 const colorPalette = document.getElementById('color-palette');
@@ -77,29 +76,21 @@ brushSizeSlider.addEventListener('input', (e) => {
     currentBrushSize = e.target.value;
 });
 
-// --- START: MODIFIED --- Updated Undo Button Logic
 undoBtn.addEventListener('click', () => {
     if (historyStack.length === 0) return;
 
     const lastAction = historyStack.pop();
 
     if (lastAction.type === 'brush') {
-        // If it was a brush stroke, destroy the Konva.Line node
         lastAction.node.destroy();
         drawingLayer.batchDraw();
     } else if (lastAction.type === 'fill') {
-        // If it was a fill, we must restore the canvas pixel data
-
-        // Also remove this fill from the resize history
         fillHistory.pop();
-
-        // Restore the saved canvas state
         const sourceCanvas = currentImageNode.image();
         sourceCanvas.getContext('2d').putImageData(lastAction.imageData, 0, 0);
         backgroundLayer.batchDraw();
     }
 });
-// --- END: MODIFIED ---
 
 clearBtn.addEventListener('click', () => {
     const activeThumb = document.querySelector('.thumbnail.active');
@@ -196,18 +187,24 @@ function floodFill(startX, startY, fillColorRgb) {
 
 // --- CANVAS LOGIC ---
 function fitImageToContainer(image) {
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
     const imageRatio = image.width / image.height;
     const containerRatio = containerWidth / containerHeight;
     let newWidth, newHeight;
+    
+    // Calculate maximum dimensions that fit within container
+    const maxImageWidth = containerWidth * 0.9; // Use 90% of container width
+    const maxImageHeight = containerHeight * 0.9; // Use 90% of container height
+    
     if (imageRatio > containerRatio) {
-        newWidth = containerWidth;
-        newHeight = containerWidth / imageRatio;
+        newWidth = Math.min(maxImageWidth, containerWidth);
+        newHeight = newWidth / imageRatio;
     } else {
-        newHeight = containerHeight;
-        newWidth = containerHeight * imageRatio;
+        newHeight = Math.min(maxImageHeight, containerHeight);
+        newWidth = newHeight * imageRatio;
     }
+    
     return {
         width: newWidth,
         height: newHeight,
@@ -220,7 +217,7 @@ function loadImageByName(fileName) {
     drawingLayer.destroyChildren();
     backgroundLayer.destroyChildren();
     fillHistory = [];
-    historyStack = []; // --- START: NEW --- Clear history on new image
+    historyStack = [];
     const imageUrl = `images/${fileName}`;
     Konva.Image.fromURL(imageUrl, (imageNode) => {
         const img = imageNode.image();
@@ -241,7 +238,29 @@ function loadImageByName(fileName) {
 
         backgroundLayer.add(imageNode);
         backgroundLayer.batchDraw();
+        
+        // Ensure stage dimensions are properly set
+        requestAnimationFrame(() => {
+            ensureStageDimensions();
+        });
     });
+}
+
+function ensureStageDimensions() {
+    const containerRect = container.getBoundingClientRect();
+    const style = window.getComputedStyle(container);
+    const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+
+    // Ensure stage never exceeds container boundaries
+    const maxWidth = Math.max(container.clientWidth - paddingX, 100);
+    const maxHeight = Math.max(container.clientHeight - paddingY, 100);
+    
+    if (stage.width() !== maxWidth || stage.height() !== maxHeight) {
+        stage.width(maxWidth);
+        stage.height(maxHeight);
+        stage.batchDraw();
+    }
 }
 
 stage.on('click tap', (e) => {
@@ -252,11 +271,9 @@ stage.on('click tap', (e) => {
         const relativeY = (pos.y - currentImageNode.y()) / currentImageNode.height();
 
         if (relativeX >= 0 && relativeX <= 1 && relativeY >= 0 && relativeY <= 1) {
-            // --- START: NEW --- Save canvas state before filling
             const sourceCanvas = currentImageNode.image();
             const beforeImageData = sourceCanvas.getContext('2d').getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
             historyStack.push({ type: 'fill', imageData: beforeImageData });
-            // --- END: NEW ---
 
             const fillColor = hexToRgb(currentColor);
             fillHistory.push({ relativeX, relativeY, color: fillColor });
@@ -286,13 +303,11 @@ stage.on('mousedown touchstart', (e) => {
     drawingLayer.add(lastLine);
 });
 
-// --- START: MODIFIED --- Add brush stroke to history on mouseup
 stage.on('mouseup touchend', () => {
     if (!isPaint) return;
     isPaint = false;
     historyStack.push({ type: 'brush', node: lastLine });
 });
-// --- END: MODIFIED ---
 
 stage.on('mousemove touchmove', (e) => {
     if (!isPaint || currentTool !== 'brush') return;
@@ -318,8 +333,12 @@ const handleResize = debounce(() => {
     const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
 
-    stage.width(container.clientWidth - paddingX);
-    stage.height(container.clientHeight - paddingY);
+    // Ensure stage never exceeds container boundaries
+    const maxWidth = Math.max(container.clientWidth - paddingX, 100);
+    const maxHeight = Math.max(container.clientHeight - paddingY, 100);
+    
+    stage.width(maxWidth);
+    stage.height(maxHeight);
 
     const newDimensions = fitImageToContainer(currentImageNode.image());
     currentImageNode.setAttrs(newDimensions);
@@ -366,4 +385,14 @@ const handleResize = debounce(() => {
 window.addEventListener('resize', handleResize);
 
 // --- INITIAL LOAD ---
-loadImageByName(imageFiles[0]);
+// Ensure proper initial sizing
+requestAnimationFrame(() => {
+    ensureStageDimensions();
+    loadImageByName(imageFiles[0]);
+});
+
+// Add resize observer for better responsiveness
+const resizeObserver = new ResizeObserver(() => {
+    handleResize();
+});
+resizeObserver.observe(container);
