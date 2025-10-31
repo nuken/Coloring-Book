@@ -14,14 +14,14 @@ body, html {
 
 .app-container {
     display: grid;
-    grid-template-columns: 120px 1fr;
+    grid-template-columns: 200px 1fr;
     width: 100%;
     height: 100%;
 }
 
 .toolbar {
     flex-shrink: 0;
-    width: 120px;
+    width: 200px;
     background-color: #fff;
     padding: 15px;
     box-shadow: 2px 0 5px rgba(0,0,0,0.1);
@@ -94,8 +94,8 @@ body, html {
 
 .canvas-container {
     display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
+    justify-content: center; /* Changed from flex-start */
+    align-items: center;     /* Changed from flex-start */
     padding: 20px;
     background-color: #e9e9e9;
     overflow: hidden;
@@ -121,7 +121,7 @@ body, html {
     width: 45px;
     height: 45px;
     border-radius: 8px;
-    border: 3px solid #ccc;
+    border: 2px solid #ccc;
     cursor: pointer;
     object-fit: cover;
     transition: all 0.2s ease-in-out;
@@ -129,11 +129,13 @@ body, html {
 
 .thumbnail:hover {
     border-color: #999;
+    transform: scale(2);
+
 }
 
 .thumbnail.active {
     border-color: #007bff;
-    transform: scale(1.1);
+    transform: scale(1.2);
 }
 
 /* --- END: NEW STYLES --- */
@@ -141,11 +143,11 @@ body, html {
 /* --- START: DESKTOP STYLES --- */
 @media (min-width: 1024px) {
     .app-container {
-        grid-template-columns: 180px 1fr;
+        grid-template-columns: 240px 1fr;
     }
 
     .toolbar {
-        width: 180px;
+        width: 240px;
     }
 
     .image-selector, .palette {
@@ -157,11 +159,11 @@ body, html {
 /* --- TABLET PORTRAIT FIXES --- */
 @media (max-width: 768px) and (orientation: portrait) {
     .app-container {
-        grid-template-columns: 100px 1fr;
+        grid-template-columns: 140px 1fr;
     }
     
     .toolbar {
-        width: 100px;
+        width: 140px;
         padding: 10px;
         gap: 15px;
     }

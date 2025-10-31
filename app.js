@@ -187,29 +187,30 @@ function floodFill(startX, startY, fillColorRgb) {
 
 // --- CANVAS LOGIC ---
 function fitImageToContainer(image) {
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+    const stageWidth = stage.width();
+    const stageHeight = stage.height();
     const imageRatio = image.width / image.height;
-    const containerRatio = containerWidth / containerHeight;
+    const stageRatio = stageWidth / stageHeight;
     let newWidth, newHeight;
-    
-    // Calculate maximum dimensions that fit within container
-    const maxImageWidth = containerWidth * 0.9; // Use 90% of container width
-    const maxImageHeight = containerHeight * 0.9; // Use 90% of container height
-    
-    if (imageRatio > containerRatio) {
-        newWidth = Math.min(maxImageWidth, containerWidth);
+
+    // Calculate maximum dimensions that fit within the stage with a 10% margin
+    const maxImageWidth = stageWidth * 0.9;
+    const maxImageHeight = stageHeight * 0.9;
+
+    if (imageRatio > stageRatio) {
+        newWidth = maxImageWidth;
         newHeight = newWidth / imageRatio;
     } else {
-        newHeight = Math.min(maxImageHeight, containerHeight);
+        newHeight = maxImageHeight;
         newWidth = newHeight * imageRatio;
     }
-    
+
     return {
         width: newWidth,
         height: newHeight,
-        x: (containerWidth - newWidth) / 2,
-        y: (containerHeight - newHeight) / 2,
+        // Center the image within the stage
+        x: (stageWidth - newWidth) / 2,
+        y: (stageHeight - newHeight) / 2,
     };
 }
 
